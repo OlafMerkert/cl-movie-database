@@ -41,6 +41,12 @@
   "Die man auch mit Indizes durchsuchen kann."
   (nth (+ 2 n) tag))
 
+(defun tag-text (tag)
+  (let ((first-child (tag-child tag 0)))
+    (if (stringp first-child)
+        (strip first-child)
+        (format nil "~A" first-child))))
+
 
 (defun tag-name-test (s tag)
   "Erzeuge Code, der den Tag-Namen von TAG auf Gleichheit mit"
