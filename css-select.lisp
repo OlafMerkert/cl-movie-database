@@ -6,6 +6,7 @@
            :tag-children :tag-child
            :css-selection
            :css-select
+           :fun :next :previous
            :tag :parent
            :strip
            :string-contains))
@@ -47,16 +48,32 @@
                   ,(keyw s))
       t))
 
+(defmacro! in (o!x &rest possibilities)
+  `(or
+    ,@(mapcar #`(eq ,g!x ,a1) possibilities)))
+
 (defun special-selector-p (selector)
-  (eq 'fun (car selector)))
+  (in (car selector) 'fun 'parent 'next 'previous))
 
 (defun selector->testfun (selector)
   (with-gensyms!
    (let ((selector (mklist selector)))
      (cond
-       ((special-selector-p selector)   ; special function evaluation
+       ((eq (car selector) 'fun)                      ; special function evaluation
         `(ilambda (tag parent)
            ,@(cdr selector)))
+       ((eq (car selector) 'parent)
+        `(ilambda (tag parent)
+           parent))
+       ((eq (car selector) 'next)
+        `(ilambda (tag parent)
+           (tag-child parent
+                      (+ (position tag (tag-children parent)) 1))))
+       ((eq (car selector) 'previous)
+        `(ilambda (tag parent)
+           (tag-child parent
+                      (- (position tag (tag-children parent)) 1))))
+       
        (t                               ; Standard Css selector
         (ecase (length selector)
           ;; Teste nur auf Tag Name
