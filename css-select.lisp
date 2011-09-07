@@ -4,8 +4,9 @@
            :tag-name
            :tag-attributes :tag-attribute
            :tag-children :tag-child
+           :tag-text
            :css-selection
-           :css-select
+           :css-select :css-select1
            :fun :next :previous
            :tag :parent :child
            :strip
@@ -127,12 +128,15 @@
           (t                            ; first item not a tag
            #1#))))
 
-(defmacro css-select (selector &rest nodes)
+(defmacro css-select (node &rest selector)
   "Benutze eine Art von CSS-Selektoren, um einen lhtml-Baum zu durchforsten."
   `(css-selection
     (list ,@(mapcar #'selector->testfun (mklist selector)))
-    (list ,@(mapcar #'special-selector-p (mklist selector)))
-    (list ,@nodes)))
+    (list ,@(mapcar (compose #'special-selector-p #'mklist) (mklist selector)))
+    (list ,node)))
+
+(defmacro css-select1 (node &rest selector)
+  `(first (css-select ,node ,@selector)))
 
 ;; Bsp
 ;; (css-select p *sample*) ; Alle p -Tags
