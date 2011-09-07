@@ -6,6 +6,7 @@
            :tag-children :tag-child
            :css-selection
            :css-select
+           :tag :parent
            :strip
            :string-contains))
 
@@ -46,43 +47,62 @@
                   ,(keyw s))
       t))
 
+(defun special-selector-p (selector)
+  (eq 'fun (car selector)))
+
 (defun selector->testfun (selector)
   (with-gensyms!
    (let ((selector (mklist selector)))
-     (ecase (length selector)
-       ;; Teste nur auf Tag Name
-       (1 `(lambda (,g!tag) ,(tag-name-test (first selector) g!tag)))
-       ;; Teste auf Tag Name und Vorhandensein des Attributs
-       (2 `(lambda (,g!tag)
-             (and ,(tag-name-test (first selector) g!tag)
-                  (tag-attribute ,g!tag ,(keyw (second selector))))))
-       ;; Test auf Tag Name und Inhalt des Attributs
-       (3 `(lambda (,g!tag)
-             (and ,(tag-name-test (first selector) g!tag)
-                  (string-contains
-                   ,(third selector)
-                   (tag-attribute ,g!tag ,(keyw (second selector)))))))))))
+     (cond
+       ((special-selector-p selector)   ; special function evaluation
+        `(ilambda (tag parent)
+           ,@(cdr selector)))
+       (t                               ; Standard Css selector
+        (ecase (length selector)
+          ;; Teste nur auf Tag Name
+          (1 `(ilambda (,g!tag ,g!parent) ,(tag-name-test (first selector) g!tag)))
+          ;; Teste auf Tag Name und Vorhandensein des Attributs
+          (2 `(ilambda (,g!tag ,g!parent)
+                (and ,(tag-name-test (first selector) g!tag)
+                     (tag-attribute ,g!tag ,(keyw (second selector))))))
+          ;; Test auf Tag Name und Inhalt des Attributs
+          (3 `(ilambda (,g!tag ,g!parent)
+                (and ,(tag-name-test (first selector) g!tag)
+                     (string-contains
+                      ,(third selector)
+                      (tag-attribute ,g!tag ,(keyw (second selector)))))))))))))
 
-(defun css-selection (selector-stack tag-stream)
-  "SELECTOR-STACK ist eine Liste von Funktionen, TAG-STREAM eine Liste von lhtml Knoten."
-  (mapcan (lambda (tag)
-            (when (tag-p tag)           ; Nur relevant fuer Tags
-              (append
-               ;; Teste, ob der Selector greift
-               (if (funcall (first selector-stack) tag)
-                   ;; Falls dies der letzte Selector war,
-                   ;; liefere den Tag zurueck
-                   (if (rest selector-stack)
-                       (css-selection (rest selector-stack) (tag-children tag))
-                       (list tag))
-                   nil)
-               (css-selection selector-stack (tag-children tag))))) 
-          tag-stream))
+(defun css-selection (selector-stack special-stack tag-list &optional parent)
+  "SELECTOR-STACK ist eine Liste von Funktionen, TAG-LIST eine Liste von lhtml Knoten."
+  ;; Noch weitere Selektoren
+  (cond ((null selector-stack)      ; no more selectors -- return data
+         (if parent
+             (list parent)
+             (copy-list tag-list)))
+        ((null tag-list))      ; no tags -- nothing to do
+        ((first special-stack)   ; filter through the special selector
+         (css-selection (rest selector-stack) (rest special-stack)
+                        (filter (lambda (x) (funcall (first selector-stack) x parent))
+                                tag-list)))
+        ((funcall (first selector-stack) (first tag-list) parent)
+         ;; ^^ the first item matches
+         (nconc
+          (css-selection (rest selector-stack) (rest special-stack)
+                         (tag-children (first tag-list))
+                         (first tag-list))
+          #1=(css-selection selector-stack special-stack (rest tag-list) parent)))
+        (t                              ; no match, go deeper
+         (nconc
+          (css-selection selector-stack special-stack
+                         (tag-children (first tag-list))
+                         (first tag-list))
+          #1#))))
 
 (defmacro css-select (selector &rest nodes)
   "Benutze eine Art von CSS-Selektoren, um einen lhtml-Baum zu durchforsten."
   `(css-selection
     (list ,@(mapcar #'selector->testfun (mklist selector)))
+    (list ,@(mapcar #'special-selector-p (mklist selector)))
     (list ,@nodes)))
 
 ;; Bsp
