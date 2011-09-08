@@ -123,9 +123,9 @@
      (nodes (css-select page
                         (:div :id "main")
                         (:table :style nil)
-                        (:tr)
-                        (child 2)
-                        (:a)))
+                        #|(:tr)|#
+                        #|(child 2)|#
+                        (:a :href "^/title/")))
      (imdb (subseq (tag-attribute (css-select1 page (:link :rel "canonical")) :href)
                    #.(length "http://www.imdb.com"))))
   (if (string= page-title "IMDb Title Search") ; make sure we are on the search page
@@ -133,7 +133,7 @@
                   (make-instance 'title
                                  :name (tag-child node 0)
                                  :imdb (tag-attribute node :href)))
-                nodes)
+                (remove-if-not (lambda (x) (stringp (tag-child x 0))) nodes))
       ;; otherwise we are already on a detail page
       (list (title-details imdb))))
 

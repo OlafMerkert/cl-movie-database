@@ -51,4 +51,4 @@
         (values no-ext no-ext part))))
 
 (defun path->title (path)
-  (first (title-search (nth-value 1 (path->titlename path)))))
+  (fetch (first (title-search (nth-value 1 (path->titlename path))))))
