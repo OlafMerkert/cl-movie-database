@@ -3,6 +3,11 @@
   :depends-on ("drakma"
                "closure-html"
                "cl-ppcre"
-               "ol-utils")
+               "ol-utils"
+               "com.gigamonkeys.pathnames"
+               "split-sequence"
+               "clsql-sqlite3")
   :components ((:file "css-select")
-               (:file "retrieval")))
+               (:file "load-cookie")
+               (:file "retrieval")
+               (:file "file-analysis")))

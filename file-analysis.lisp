@@ -11,12 +11,29 @@
    (imdb-title)
    ))
 
-(defparameter *example-dir*
+(defparameter *movie-dir*
   #P "/media/wdbackup1/filme/")
+
+(defparameter *blacklist*
+  (mapcar
+   (lambda (p) (merge-pathnames p *movie-dir*))
+   '("SERIEN/"
+     "GENRES/"
+     "MIT Lisp Lectures/"
+     "Operation Red Flag/"
+     "Star Trek/"
+     "Woody Allen/")))
+
+(defun movie-file-listing ()
+  (sort 
+   (set-difference (list-directory *movie-dir*)
+                   *blacklist*
+                   :test #'equal)
+   #'string-lessp :key #'basename))
 
 (defun title-listing (dir)
   (mapcar #'path->title
-          (list-directory dir)))
+          (movie-file-listing)))
 
 (defun basename (path)
   (or (pathname-name path)
