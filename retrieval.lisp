@@ -1,7 +1,13 @@
 (defpackage :md-retrieval
   (:nicknames :retr)
   (:use :cl :ol-utils :css-select)
-  (:export))
+  (:export :define-grab :page
+           :define-standard-print-object
+           
+           :imdb :name :full :title :year :director :actors :genres
+           :tv-series-p :filled-p :episode :season :episodes
+           :title-search :title-details :title-episodes
+           :fetch ))
 
 (in-package :md-retrieval)
 
@@ -22,51 +28,85 @@
   (let ((slots-flat (flatten slots)))
     `(defmethod print-object ((,g!object ,class) ,g!stream)
        (print-unreadable-object (,g!object ,g!stream :type t)
-         (with-slots ,slots-flat ,g!object
+         (with-slots ,(remove-if-not #'symbolp slots-flat) ,g!object
            (format ,g!stream ,(format nil "~{~A~^ ~}"
-                                      (mapcar (lambda (x)
-                                                (if (listp x)
-                                                    "[~A]" "~A"))
+                                      (mapcar (alambda (x)
+                                                       (if (listp x)
+                                                           (format nil "[~{~A~^ ~}]"
+                                                                   (mapcar #'self x))
+                                                           "~A"))
                                               slots))
                    ,@slots-flat))))))
 
-(defclass name ()
-  ((name :accessor name
-         :initarg  :name
-         :initform "")
-   (imdb :accessor imdb
-         :initarg  :imdb
-         :initform "")))
-
-(define-standard-print-object name  name (imdb))
-
-(defclass title ()
+(defclass imdb ()
   ((name :accessor name
          :initarg  :name
          :initform "")
    (imdb :accessor imdb
          :initarg  :imdb
          :initform "")
-   (year)
-   (original-name)))
+   (full :accessor filled-p
+         :initarg  :full
+         :initform nil)))
 
-(define-standard-print-object title  name (imdb))
+(defgeneric fetch (obj))
+(defgeneric fetch% (obj))
 
-(defclass episode ()
+(defmethod fetch ((imdb imdb))
+  (unless (filled-p imdb)
+    (fetch% imdb))
+  imdb)
+
+(defclass name (imdb)
+  ())
+
+(define-standard-print-object imdb  name (imdb))
+
+(defclass title (imdb)
+  ((year :accessor year
+         :initarg  :year
+         :initform nil)
+   (director :accessor director
+             :initarg  :director
+             :initform nil)
+   (actors :accessor actors
+           :initarg  :actors
+           :initform nil)
+   (genres :accessor genres
+           :initarg  :genres
+           :initform nil)))
+
+(defmethod tv-series-p ((title title))
+  (and (filled-p title)
+       (null (year title))))
+
+(defmethod fetch% ((title title))
+  (let ((other (title-details (imdb title))))
+    (dolist (slot '(name year director actors genres))
+      (setf (slot-value title slot)
+            (slot-value other slot)))
+    (setf (slot-value 'full title) t)))
+
+(defmethod episodes ((title title))
+  (when (tv-series-p title)
+    (let ((ep-list (title-episodes (imdb title))))
+      (dolist (x ep-list)
+        (setf (slot-value x 'title)
+              title))
+      ep-list)))
+
+(defclass episode (imdb)
   ((season :accessor season
            :initarg  :season
            :initform 1)
    (episode :accessor episode
             :initarg  :episode
             :initform 1)
-   (name :accessor name
-         :initarg  :name
-         :initform "")
    (title :accessor title
           :initarg  :title
           :initform nil)))
 
-(define-standard-print-object episode  season episode (name))
+(define-standard-print-object episode  ("S" season "E" episode) name)
 
 (define-grab title-search (search-string)
     "http://www.imdb.com/find?s=tt&q=~A"
@@ -98,14 +138,14 @@
 
      (genres (mapcar #'tag-text (css-select page (nil :itemprop "genre")))))
   
-  (list 'title 
-        :full t
-        :imdb imdb
-        :name name
-        :year year
-        :director director
-        :actors actors
-        :genres genres))
+  (make-instance 'title 
+                 :full t
+                 :imdb imdb
+                 :name name
+                 :year year
+                 :director director
+                 :actors actors
+                 :genres genres))
 
 
 (define-grab title-episodes (imdb)
@@ -115,7 +155,7 @@
                                 (:td)
                                 (:h3))))
   (filter (lambda (x)
-            (let ((name (tag-text (css-select1 x :a)))
+            (let ((name (css-select1 x :a))
                   (hits (or (not (stringp (tag-text x)))
                             (nth-value 1
                                        (cl-ppcre:scan-to-strings
@@ -123,7 +163,8 @@
                                         (tag-text x))))))
               (when hits
                 (make-instance 'episode
-                               :name name
+                               :name (tag-text name)
+                               :imdb (tag-attribute name :href)
                                :season (parse-integer (aref hits 0))
                                :episode (parse-integer (aref hits 1))))))
           episode-nodes))
