@@ -88,11 +88,12 @@
        (null (year title))))
 
 (defmethod fetch% ((title title))
+  #d
   (let ((other (title-details (imdb title))))
     (dolist (slot '(name year director actors genres))
       (setf (slot-value title slot)
             (slot-value other slot)))
-    (setf (slot-value 'full title) t)))
+    (setf (slot-value title 'full) t)))
 
 (defmethod episodes ((title title))
   (when (tv-series-p title)
