@@ -119,22 +119,23 @@
     "http://www.imdb.com/find"
     (("s" "tt")
      ("q" search-string))
-    ((nodes (css-select page
+    ((page-title (tag-text (css-select1 page (:head) (:title))))
+     (nodes (css-select page
                         (:div :id "main")
                         (:table :style nil)
                         (:tr)
                         (child 2)
-                        (:a))))
-  (aif (mapcar (lambda (node)
-             (make-instance 'title
-                            :name (tag-child node 0)
-                            :imdb (tag-attribute node :href)))
-               nodes)
-       it
-       ;; consider exact matches with automatic redirection
-       (let ((imdb (subseq (tag-attribute (css-select1 page (:link :rel "canonical")) :href)
-                           #.(length "http://www.imdb.com"))))
-         (list (title-details imdb)))))
+                        (:a)))
+     (imdb (subseq (tag-attribute (css-select1 page (:link :rel "canonical")) :href)
+                   #.(length "http://www.imdb.com"))))
+  (if (string= page-title "IMDb Title Search") ; make sure we are on the search page
+      (mapcar (lambda (node)
+                  (make-instance 'title
+                                 :name (tag-child node 0)
+                                 :imdb (tag-attribute node :href)))
+                nodes)
+      ;; otherwise we are already on a detail page
+      (list (title-details imdb))))
 
 (defun link->name (a)
   (make-instance 'name :name (tag-text a)
