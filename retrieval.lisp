@@ -11,20 +11,22 @@
 
 (in-package :md-retrieval)
 
-
+(defparameter *cookie-jar*
+  (md-load-cookie:obtain-imdb-cookie-jar))
 
 (defun page-from-url (url &optional parameters)
   (chtml:parse
-   (drakma:http-request url :method :get :parameters parameters)
+   (drakma:http-request url :method :get :parameters parameters
+                        :cookie-jar *cookie-jar*)
    (chtml:make-lhtml-builder)))
 
 (defmacro define-grab (name params grab-url grab-parameters temporary-vars &body result)
-  `(defun ,name ,params
+  `(defun ,name (,@params)
      (let ((page (page-from-url
-                  (format nil ,grab-url ,@params)
-                  (list ,@(mapcar #`(cons ,(first a1)
-                                                      ,(second a1))
-                                              grab-parameters)))))
+             (format nil ,grab-url ,@params)
+             (list ,@(mapcar #`(cons ,(first a1)
+                                     ,(second a1))
+                             grab-parameters)))))
        (let* ,temporary-vars
          ,@result))))
 
@@ -123,11 +125,16 @@
                         (:tr)
                         (child 2)
                         (:a))))
-  (mapcar (lambda (node)
-            (make-instance 'title
-                           :name (tag-child node 0)
-                           :imdb (tag-attribute node :href)))
-          nodes))
+  (aif (mapcar (lambda (node)
+             (make-instance 'title
+                            :name (tag-child node 0)
+                            :imdb (tag-attribute node :href)))
+               nodes)
+       it
+       ;; consider exact matches with automatic redirection
+       (let ((imdb (subseq (tag-attribute (css-select1 page (:link :rel "canonical")) :href)
+                           #.(length "http://www.imdb.com"))))
+         (list (title-details imdb)))))
 
 (defun link->name (a)
   (make-instance 'name :name (tag-text a)
