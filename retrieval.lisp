@@ -11,15 +11,20 @@
 
 (in-package :md-retrieval)
 
-(defun page-from-url (url)
+
+
+(defun page-from-url (url &optional parameters)
   (chtml:parse
-   (drakma:http-request url)
+   (drakma:http-request url :method :get :parameters parameters)
    (chtml:make-lhtml-builder)))
 
-(defmacro define-grab (name params grab-url temporary-vars &body result)
+(defmacro define-grab (name params grab-url grab-parameters temporary-vars &body result)
   `(defun ,name ,params
      (let ((page (page-from-url
-                  (format nil ,grab-url ,@params))))
+                  (format nil ,grab-url ,@params)
+                  (list ,@(mapcar #`(cons ,(first a1)
+                                                      ,(second a1))
+                                              grab-parameters)))))
        (let* ,temporary-vars
          ,@result))))
 
@@ -109,7 +114,9 @@
 (define-standard-print-object episode  ("S" season "E" episode) name)
 
 (define-grab title-search (search-string)
-    "http://www.imdb.com/find?s=tt&q=~A"
+    "http://www.imdb.com/find"
+    (("s" "tt")
+     ("q" search-string))
     ((nodes (css-select page
                         (:div :id "main")
                         (:table :style nil)
@@ -128,6 +135,7 @@
 
 (define-grab title-details (imdb)
     "http://www.imdb.com~A"
+    ()
     ((title-header (css-select1 page (nil :itemprop "name")))
      (name (tag-text title-header))
      (year  (tag-text (css-select1 title-header (:a :href "^/year"))))
@@ -150,10 +158,11 @@
 
 (define-grab title-episodes (imdb)
     "http://www.imdb.com~Aepisodes"
-    ((episode-nodes (css-select page
-                                (:div :class "season-filter-all")
-                                (:td)
-                                (:h3))))
+  ()
+  ((episode-nodes (css-select page
+                              (:div :class "season-filter-all")
+                              (:td)
+                              (:h3))))
   (filter (lambda (x)
             (let ((name (css-select1 x :a))
                   (hits (or (not (stringp (tag-text x)))
