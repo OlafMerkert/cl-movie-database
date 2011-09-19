@@ -2,8 +2,6 @@
   (:nicknames :retr)
   (:use :cl :ol-utils :css-select)
   (:export :define-grab :page
-           :define-standard-print-object
-           
            :imdb :name :full :title :year :director :actors :genres
            :tv-series-p :filled-p :episode :season :episodes
            :title-search :title-details :title-episodes
@@ -30,20 +28,7 @@
        (let* ,temporary-vars
          ,@result))))
 
-(defmacro! define-standard-print-object
-    (class &rest slots)
-  (let ((slots-flat (flatten slots)))
-    `(defmethod print-object ((,g!object ,class) ,g!stream)
-       (print-unreadable-object (,g!object ,g!stream :type t)
-         (with-slots ,(remove-if-not #'symbolp slots-flat) ,g!object
-           (format ,g!stream ,(format nil "~{~A~^ ~}"
-                                      (mapcar (alambda (x)
-                                                       (if (listp x)
-                                                           (format nil "[~{~A~^ ~}]"
-                                                                   (mapcar #'self x))
-                                                           "~A"))
-                                              slots))
-                   ,@slots-flat))))))
+
 
 (defclass imdb ()
   ((name :accessor name
@@ -67,7 +52,7 @@
 (defclass name (imdb)
   ())
 
-(define-standard-print-object imdb  name (imdb))
+(create-standard-print-object imdb  name (imdb))
 
 (defclass title (imdb)
   ((year :accessor year
@@ -114,7 +99,7 @@
           :initarg  :title
           :initform nil)))
 
-(define-standard-print-object episode  ("S" season "E" episode) name)
+(create-standard-print-object episode  ("S" season "E" episode) name)
 
 (define-grab title-search (search-string)
     "http://www.imdb.com/find"
